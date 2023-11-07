@@ -32,6 +32,8 @@ clientID=os.getenv("CLIENT_ID")
 clientSecret=os.getenv("CLIENT_SECRET")
 urlAuth=os.getenv("URL_AUTH")
 xSessionKeyTrue=os.getenv("X_SESSION_KEY_TRUE")
+rutaRecaudador=os.getenv("RUTA_RECAUDADOR")
+rutaConsultaPago=os.getenv("RUTA_CONSULTA_PAGO")
 
 #Get the port and ip from the server
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -157,6 +159,72 @@ def solicitar_linea_captura(token,folio,idTramite):
     dataDesencriptado= json.loads(desencriptadoLineaCaptura)
     
     return dataDesencriptado
+
+@app.route("/pagoRecaudador",methods=["POST"])
+def pagoRecaudador():
+    try:
+        requestData=request.get_json()
+        dataEncriptada=encriptarData(requestData)
+
+        #Generacion del token
+        user = requestData['user']
+        email = requestData['email']
+        data=json.dumps({"user":user, "email":email}, separators=(',', ':'))
+        tokenGenerado=str(generarToken(data))
+        #Fin de generacion del token
+
+        header={
+                        'Content-Type':'application/json',
+                        'Access-Control-Allow-Methods':'GET, POST', 
+                        'X-API-KEY':apiKey,
+                        'X-CHANNEL-SERVICE':xChannel,
+                        'X-SISTEMA-KEY':xSistemaKey,
+                        'X-SESSION-KEY':xSessionKeyTrue,
+                        'Authorization':'Bearer '+ tokenGenerado
+                    }
+
+        dataEnviar=json.dumps({"data":dataEncriptada},separators=(',', ':'))
+        param={"query":False}
+        
+        return dataEnviar
+    except Exception as error:
+     logging.warning(error)
+
+
+@app.route("/consultarPago", methods=["POST"])
+def consultarPago():
+    data=request.get_json()
+    folio=data["folioseguimiento"]
+    idtramite=data["idtramite"]
+    folioestado=data["foliocontrol"]
+
+    user = data['user']
+    email = data['email']
+
+    data=json.dumps({"user":user, "email":email}, separators=(',', ':'))
+    tokenGenerado=generarToken(data)
+    logging.warning("token: "+tokenGenerado)
+
+    consulta="/?folioSeguimiento="+folio+"&idTramite="+idtramite+"&folioControlEstado="+ folioestado
+    dataEncriptada=encriptarData(consulta)
+    logging.warning("data: "+dataEncriptada)
+
+    header={
+                'Content-Type':'application/json',
+                'Access-Control-Allow-Methods':'GET, POST', 
+                'X-API-KEY':apiKey,
+                'X-CHANNEL-SERVICE':xChannel,
+                'X-SISTEMA-KEY':xSistemaKey,
+                'X-SESSION-KEY':xSessionKeyTrue,
+                'Authorization':'Bearer '+ tokenGenerado
+            }
+    param=json.dumps({"query":dataEncriptada})
+    
+    response=requests.get(url=rutaConsultaPago+"?query="+dataEncriptada,headers=header)
+    desencriptadoLineaCaptura=desencriptado(response.text)
+    dataDesencriptado= json.loads(desencriptadoLineaCaptura)
+    return dataDesencriptado
+
 
 
 if __name__=="__main__":
